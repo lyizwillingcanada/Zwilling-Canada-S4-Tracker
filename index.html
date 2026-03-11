@@ -662,6 +662,14 @@
         </h4>
         <p>Push all tasks to your Google Sheet, or pull updates back from the sheet into this tracker. The sheet is found by name automatically.</p>
         <div id="int-sheets-status" style="font-size:11px; color:var(--muted); margin-bottom:8px; font-family:'DM Mono',monospace;"></div>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;display:block;margin-bottom:4px;">SPREADSHEET ID (from sheet URL) — paste if auto-find fails</label>
+          <div style="display:flex;gap:8px;">
+            <input class="int-input" id="manual-sheet-id" placeholder="e.g. 1-Vajr0J_K2XV1_h7Fj8QASZG0fn-mW8vUX6s8DE4_MU" style="margin-bottom:0;font-size:11px;font-family:'DM Mono',monospace;" />
+            <button class="btn btn-ghost" style="font-size:11px;white-space:nowrap;" onclick="useManualSheetId()">Use This ID</button>
+          </div>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px;">Open your Google Sheet → copy the long ID from the URL between /d/ and /edit</div>
+        </div>
         <div class="int-btn-row">
           <button class="btn btn-primary" onclick="pushToSheets()" style="font-size:12px;">⬆ Push to Sheets</button>
           <button class="btn btn-ghost" onclick="pullFromSheets()" style="font-size:12px;">⬇ Pull from Sheets</button>
@@ -1296,7 +1304,7 @@ document.getElementById('integration-modal').addEventListener('click', function(
 let _gToken = null;
 let _gClientId = null;
 let _driveFileId = null;
-let _sheetId = null;
+let _sheetId = '1-Vajr0J_K2XV1_h7Fj8QASZG0fn-mW8vUX6s8DE4_MU'; // Zwilling Canada S4 Tracker
 const SHEET_NAME = 'Zwilling Canada S4 Tracker';
 const DRIVE_FILE  = 'zwilling_s4_tracker.json';
 const HEADERS = ['#', 'Task Name', 'Status', 'Owner', 'Target Date', 'Last Updated', 'Notes / Next Steps'];
@@ -1327,7 +1335,7 @@ function connectGoogle() {
     google.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: [
-        'https://www.googleapis.com/auth/drive.file',
+        'https://www.googleapis.com/auth/drive',
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/userinfo.email'
       ].join(' '),
@@ -1468,22 +1476,38 @@ async function loadFromDrive(fileId) {
 }
 
 // ── SHEETS — FIND / CREATE ──
+function useManualSheetId() {
+  const input = document.getElementById('manual-sheet-id').value.trim();
+  if (!input) { showToast('⚠ Paste a Spreadsheet ID first'); return; }
+  // Accept either a full URL or just the ID
+  const match = input.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  _sheetId = match ? match[1] : input;
+  document.getElementById('int-sheets-status').textContent = '✅ Sheet ID set: ' + _sheetId.slice(0,18) + '…';
+  document.getElementById('sheets-pill-text').textContent = 'Sheet Linked ✓';
+  showToast('✅ Sheet ID saved — click Push to Sheets');
+}
+
 async function findSheet() {
   if (!_gToken) return;
   try {
     const q = encodeURIComponent("name='" + SHEET_NAME + "' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false");
-    const res = await fetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name)', {
+    const res = await fetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name)&includeItemsFromAllDrives=true&supportsAllDrives=true', {
       headers: { Authorization: 'Bearer ' + _gToken }
     });
     const d = await res.json();
+    console.log('findSheet response:', d);
     if (d.files && d.files.length) {
       _sheetId = d.files[0].id;
-      document.getElementById('int-sheets-status').textContent = '✅ Sheet found: ' + SHEET_NAME + ' (' + _sheetId.slice(0,10) + '…)';
+      document.getElementById('int-sheets-status').textContent = '✅ Sheet found: ' + d.files[0].name;
       document.getElementById('sheets-pill-text').textContent = 'Sheet Linked ✓';
     } else {
-      document.getElementById('int-sheets-status').textContent = 'Sheet not found — click "Create Sheet" to make one.';
+      document.getElementById('int-sheets-status').textContent = '⚠ Auto-find failed — paste your Spreadsheet ID above.';
+      showToast('⚠ Sheet not found by name — paste the ID manually');
     }
-  } catch(e) {}
+  } catch(e) {
+    console.error('findSheet error:', e);
+    document.getElementById('int-sheets-status').textContent = '⚠ Search error — paste Spreadsheet ID manually.';
+  }
 }
 
 async function createSheet() {
@@ -1509,84 +1533,40 @@ async function createSheet() {
 // ── SHEETS PUSH ──
 async function pushToSheets() {
   if (!_gToken) { showToast('⚠ Connect Google first'); return; }
-  if (!_sheetId) { await findSheet(); }
-  if (!_sheetId) { showToast('⚠ Sheet not found — click "Create Sheet" first'); return; }
 
   saveTasks();
   showToast('⏳ Pushing to Sheets…');
 
+  const SHEET_ID = '1-Vajr0J_K2XV1_h7Fj8QASZG0fn-mW8vUX6s8DE4_MU';
   const values = [HEADERS, ...tasks.map(t => [
     t.id, t.name, t.status, t.owner, t.targetDate, t.lastUpdated,
     (t.notes || '').replace(/\n/g, ' | ')
   ])];
 
-  const BASE = 'https://sheets.googleapis.com/v4/spreadsheets/' + _sheetId;
-  const AUTH = { Authorization: 'Bearer ' + _gToken, 'Content-Type': 'application/json' };
-
   try {
-    // Step 1 — get the real sheetId (integer) for the first tab
-    const metaRes = await fetch(BASE + '?fields=sheets.properties', { headers: AUTH });
-    const meta = await metaRes.json();
-    if (!metaRes.ok) { showToast('⚠ Could not read sheet: ' + (meta.error?.message || metaRes.status)); return; }
-    const tabId = meta.sheets[0].properties.sheetId; // integer e.g. 0
-
-    // Step 2 — clear the sheet
-    const clearRes = await fetch(BASE + '/values/A1:G500:clear', {
-      method: 'POST', headers: AUTH, body: '{}'
-    });
-    if (!clearRes.ok) {
-      const ce = await clearRes.json().catch(() => ({}));
-      console.warn('Clear warning:', ce.error?.message);
-    }
-
-    // Step 3 — write values using Sheet index (Sheet1) — most reliable
-    const writeRes = await fetch(BASE + '/values/Sheet1!A1:G500?valueInputOption=RAW', {
-      method: 'PUT', headers: AUTH,
-      body: JSON.stringify({ range: 'Sheet1!A1:G500', majorDimension: 'ROWS', values })
-    });
-
-    // If Sheet1 alias fails, try by tab index
-    let finalRes = writeRes;
-    if (!writeRes.ok) {
-      const rangeEncoded = encodeURIComponent('A1:G500');
-      finalRes = await fetch(BASE + '/values/' + rangeEncoded + '?valueInputOption=RAW', {
-        method: 'PUT', headers: AUTH,
+    const res = await fetch(
+      'https://sheets.googleapis.com/v4/spreadsheets/' + SHEET_ID + '/values/A1:G500?valueInputOption=USER_ENTERED',
+      {
+        method: 'PUT',
+        headers: { Authorization: 'Bearer ' + _gToken, 'Content-Type': 'application/json' },
         body: JSON.stringify({ range: 'A1:G500', majorDimension: 'ROWS', values })
-      });
+      }
+    );
+    const data = await res.json();
+    console.log('Sheets push response:', res.status, data);
+
+    if (res.ok) {
+      _sheetId = SHEET_ID;
+      document.getElementById('sheets-pill-text').textContent = 'Sheets Synced ✓';
+      document.getElementById('int-sheets-status').textContent = '✅ Pushed ' + tasks.length + ' rows to sheet';
+      showToast('✅ Pushed to Google Sheets!');
+    } else {
+      showToast('⚠ Failed: ' + (data.error?.message || res.status));
+      document.getElementById('int-sheets-status').textContent = '⚠ ' + (data.error?.message || res.status);
     }
-
-    if (!finalRes.ok) {
-      const err = await finalRes.json().catch(() => ({}));
-      showToast('⚠ Push failed: ' + (err.error?.message || finalRes.status));
-      return;
-    }
-
-    // Step 4 — format header row (blue background, white bold text, freeze row 1)
-    await fetch(BASE + ':batchUpdate', {
-      method: 'POST', headers: AUTH,
-      body: JSON.stringify({ requests: [
-        { repeatCell: {
-            range: { sheetId: tabId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 7 },
-            cell: { userEnteredFormat: {
-              backgroundColor: { red: 0.102, green: 0.337, blue: 0.859 },
-              textFormat: { foregroundColor: { red:1, green:1, blue:1 }, bold: true, fontSize: 10 }
-            }},
-            fields: 'userEnteredFormat(backgroundColor,textFormat)'
-        }},
-        { updateSheetProperties: {
-            properties: { sheetId: tabId, gridProperties: { frozenRowCount: 1 } },
-            fields: 'gridProperties.frozenRowCount'
-        }}
-      ]})
-    });
-
-    document.getElementById('sheets-pill-text').textContent = 'Sheets Synced ✓';
-    document.getElementById('int-sheets-status').textContent = '✅ Pushed ' + tasks.length + ' rows to "' + SHEET_NAME + '"';
-    showToast('✅ Pushed to Google Sheets!');
-
   } catch(e) {
     console.error('pushToSheets error:', e);
-    showToast('⚠ Push error: ' + e.message);
+    showToast('⚠ Error: ' + e.message);
   }
 }
 
