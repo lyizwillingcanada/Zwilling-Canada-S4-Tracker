@@ -390,6 +390,49 @@
     border: 1px solid var(--border);
   }
 
+  /* ── DRIVE / SHEETS INTEGRATION ── */
+  .drive-status-pill {
+    display: flex; align-items: center; gap: 7px;
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    color: var(--muted); padding: 5px 12px; border-radius: 20px;
+    background: #f0f2f5; border: 1px solid var(--border);
+    cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .drive-status-pill:hover { border-color: var(--accent); color: var(--accent); }
+  .drive-dot { width: 7px; height: 7px; border-radius: 50%; background: #d1d5db; transition: background 0.3s; flex-shrink: 0; }
+  .drive-dot.connected { background: var(--green); }
+  .sheets-dot.synced { background: #1a56db; }
+  #integration-modal {
+    display: none; position: fixed; inset: 0;
+    background: rgba(17,24,39,0.45); backdrop-filter: blur(4px);
+    z-index: 1000; align-items: center; justify-content: center;
+  }
+  #integration-modal.show { display: flex; }
+  .int-modal-box {
+    background: #fff; border: 1px solid var(--border); border-radius: 14px;
+    padding: 32px; width: 560px; max-width: 95vw; max-height: 90vh;
+    overflow-y: auto; box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+  }
+  .int-modal-box h2 { font-family: 'Syne', sans-serif; font-size: 19px; margin-bottom: 4px; color: var(--text); }
+  .int-modal-box .int-sub { font-size: 11px; color: var(--muted); margin-bottom: 22px; font-family: 'DM Mono', monospace; }
+  .int-section { background: #f8f9fc; border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; margin-bottom: 14px; }
+  .int-section h4 { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--text); }
+  .int-section p { font-size: 12px; color: var(--muted); line-height: 1.6; margin-bottom: 12px; }
+  .int-input { width: 100%; padding: 7px 11px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; font-family: 'DM Sans', sans-serif; color: var(--text); background: #fff; outline: none; transition: border-color 0.15s; margin-bottom: 8px; }
+  .int-input:focus { border-color: var(--accent); }
+  .int-input::placeholder { color: #c0c8d8; }
+  .int-connected-bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #f0fdf4; border: 1px solid #6ee7b7; border-radius: 6px; margin-bottom: 10px; }
+  .int-connected-bar .int-label { font-size: 12px; color: #065f46; font-weight: 600; }
+  .int-connected-bar .int-email { font-size: 11px; color: #374151; font-family: 'DM Mono', monospace; margin-left: auto; }
+  .int-btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .int-file-list { margin-top: 10px; }
+  .int-file-item { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 5px; background: #fff; font-size: 12px; }
+  .int-file-item .int-fname { font-weight: 600; color: var(--text); }
+  .int-file-item .int-fmeta { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .int-setup-hint { font-size: 11px; color: var(--muted); line-height: 1.8; background: #f8f9fc; border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; margin-top: 8px; }
+  .int-setup-hint strong { color: var(--text); }
+  .int-divider { height: 1px; background: var(--border); margin: 16px 0; }
+
   .separator {
     height: 1px;
     background: var(--border);
@@ -492,9 +535,17 @@
     <p>ZWILLING GLOBAL · <span id="header-date" contenteditable="true" title="Click to edit date" style="border-bottom:1px dashed #9ca3af; cursor:text; outline:none; padding:0 2px;" onblur="saveHeaderDate()">MARCH 06, 2026</span> · OFFLINE LOCAL FILE · NO SERVER · NO NETWORK</p>
   </div>
   <div class="header-right">
-    <span id="save-status">Saved 2:08:16 PM</span>
+    <span id="save-status">Not saved</span>
+    <button class="drive-status-pill" onclick="openIntegration()" id="drive-pill">
+      <span class="drive-dot" id="drive-dot"></span>
+      <span id="drive-pill-text">Connect Drive</span>
+    </button>
+    <button class="drive-status-pill" onclick="openIntegration()" id="sheets-pill" style="display:none;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><rect x="3" y="3" width="18" height="18" rx="2" fill="#0e9f6e"/><path d="M7 8h10M7 12h10M7 16h6" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span id="sheets-pill-text">Link Sheet</span>
+    </button>
     <button class="btn btn-ghost" onclick="saveLocal()">💾 Save to Browser</button>
-    <button class="btn btn-primary" onclick="openExport()">📤 Export for Google</button>
+    <button class="btn btn-primary" onclick="openExport()">📤 Export</button>
   </div>
 </header>
 
@@ -524,157 +575,7 @@
         <th>Notes / Next Steps</th>
       </tr>
     </thead>
-    <tbody id="task-tbody"><tr data-id="1">
-      <td>1</td>
-      <td class="task-name td-name editable" contenteditable="true" data-placeholder="Task name" onblur="autoSaveField()">SAP UAT Upgrade</td>
-      <td class="status-cell">
-        <select class="status-select badge SCHEDULED" onchange="applyStatusStyle(this); autoSaveField();">
-          <option value="CAB">CAB</option><option value="DESIGN">DESIGN</option><option value="DEVELOPMENT">DEVELOPMENT</option><option value="SIT">SIT</option><option value="UAT">UAT</option><option value="SCHEDULED" selected="">SCHEDULED</option><option value="RESCHEDULED">RESCHEDULED</option><option value="PAUSED">PAUSED</option><option value="PRODUCTION">PRODUCTION</option><option value="COMPLETE">COMPLETE</option><option value="TBD">TBD</option>
-        </select>
-      </td>
-      <td class="editable td-owner" contenteditable="true" data-placeholder="Owner / Team" onblur="autoSaveField()">ZW Canada IT</td>
-      <td class="editable td-date" contenteditable="true" data-placeholder="Target date" onblur="autoSaveField()">Apr 15 2026</td>
-      <td class="editable td-updated" contenteditable="true" data-placeholder="Last updated" onblur="autoSaveField()">Mar 06, 2026</td>
-      <td class="editable td-notes" contenteditable="true" data-placeholder="Add notes / next steps..." onblur="autoSaveField()">Canada QA test plan WIP – final date TBD
-Still on plan – publish go for testing soon
-Coordinate test execution with US SAP Consultants – date TBD</td>
-    </tr><tr data-id="2">
-      <td>2</td>
-      <td class="task-name td-name editable" contenteditable="true" data-placeholder="Task name" onblur="autoSaveField()">Price Waterfall</td>
-      <td class="status-cell">
-        <select class="status-select badge PAUSED" onchange="applyStatusStyle(this); autoSaveField();">
-          <option value="CAB">CAB</option><option value="DESIGN">DESIGN</option><option value="DEVELOPMENT">DEVELOPMENT</option><option value="SIT">SIT</option><option value="UAT">UAT</option><option value="SCHEDULED">SCHEDULED</option><option value="RESCHEDULED">RESCHEDULED</option><option value="PAUSED" selected="">PAUSED</option><option value="PRODUCTION">PRODUCTION</option><option value="COMPLETE">COMPLETE</option><option value="TBD">TBD</option>
-        </select>
-      </td>
-      <td class="editable td-owner" contenteditable="true" data-placeholder="Owner / Team" onblur="autoSaveField()"></td>
-      <td class="editable td-date" contenteditable="true" data-placeholder="Target date" onblur="autoSaveField()">Feb 2026 → TBD</td>
-      <td class="editable td-updated" contenteditable="true" data-placeholder="Last updated" onblur="autoSaveField()">Mar 06, 2026</td>
-      <td class="editable td-notes" contenteditable="true" data-placeholder="Add notes / next steps..." onblur="autoSaveField()">UAT in progress (started Oct 6, 3-week duration)
-Discussing proposed model office – Nov 2025
-Go live tentatively Feb 2026 per business
-Currently PAUSED</td>
-    </tr><tr data-id="3">
-      <td>3</td>
-      <td class="task-name td-name editable" contenteditable="true" data-placeholder="Task name" onblur="autoSaveField()">Amazon EDI</td>
-      <td class="status-cell">
-        <select class="status-select badge SIT" onchange="applyStatusStyle(this); autoSaveField();">
-          <option value="CAB">CAB</option><option value="DESIGN">DESIGN</option><option value="DEVELOPMENT">DEVELOPMENT</option><option value="SIT" selected="">SIT</option><option value="UAT">UAT</option><option value="SCHEDULED">SCHEDULED</option><option value="RESCHEDULED">RESCHEDULED</option><option value="PAUSED">PAUSED</option><option value="PRODUCTION">PRODUCTION</option><option value="COMPLETE">COMPLETE</option><option value="TBD">TBD</option>
-        </select>
-      </td>
-      <td class="editable td-owner" contenteditable="true" data-placeholder="Owner / Team" onblur="autoSaveField()">ZW Canada / GPO</td>
-      <td class="editable td-date" contenteditable="true" data-placeholder="Target date" onblur="autoSaveField()">Apr 2026 (post SAP Upgrade)</td>
-      <td class="editable td-updated" contenteditable="true" data-placeholder="Last updated" onblur="autoSaveField()">Mar 06, 2026</td>
-      <td class="editable td-notes" contenteditable="true" data-placeholder="Add notes / next steps..." onblur="autoSaveField()">Finalizing test cases and execution
-CR submitted to Zwilling GPO Sep 25
-Solution to be provided by Zwilling SAP GPO
-UAT to be completed by Zwilling Canada
-Original go-live Feb 2026 → Updated: Post SAP Upgrade (Apr 2026)</td>
-    </tr><tr data-id="4">
-      <td>4</td>
-      <td class="task-name td-name editable" contenteditable="true" data-placeholder="Task name" onblur="autoSaveField()">Costco Dropship Changes</td>
-      <td class="status-cell">
-        <select class="status-select badge RESCHEDULED" onchange="applyStatusStyle(this); autoSaveField();">
-          <option value="CAB">CAB</option><option value="DESIGN">DESIGN</option><option value="DEVELOPMENT">DEVELOPMENT</option><option value="SIT">SIT</option><option value="UAT">UAT</option><option value="SCHEDULED">SCHEDULED</option><option value="RESCHEDULED" selected="">RESCHEDULED</option><option value="PAUSED">PAUSED</option><option value="PRODUCTION">PRODUCTION</option><option value="COMPLETE">COMPLETE</option><option value="TBD">TBD</option>
-        </select>
-      </td>
-      <td class="editable td-owner" contenteditable="true" data-placeholder="Owner / Team" onblur="autoSaveField()">KIBO Lead</td>
-      <td class="editable td-date" contenteditable="true" data-placeholder="Target date" onblur="autoSaveField()">Post SAP Upgrade</td>
-      <td class="editable td-updated" contenteditable="true" data-placeholder="Last updated" onblur="autoSaveField()">Mar 06, 2026</td>
-      <td class="editable td-notes" contenteditable="true" data-placeholder="Add notes / next steps..." onblur="autoSaveField()">CR submitted to Zwilling GPO Oct 2
-KIBO lead reviewing gap towards resolution
-Rescheduled – Post Upgrade</td>
-    </tr><tr data-id="5">
-      <td>5</td>
-      <td class="task-name td-name editable" contenteditable="true" data-placeholder="Task name" onblur="autoSaveField()">SSO SAP (Single Sign-On)</td>
-      <td class="status-cell">
-        <select class="status-select badge PAUSED" onchange="applyStatusStyle(this); autoSaveField();">
-          <option value="CAB">CAB</option><option value="DESIGN">DESIGN</option><option value="DEVELOPMENT">DEVELOPMENT</option><option value="SIT">SIT</option><option value="UAT">UAT</option><option value="SCHEDULED">SCHEDULED</option><option value="RESCHEDULED">RESCHEDULED</option><option value="PAUSED" selected="">PAUSED</option><option value="PRODUCTION">PRODUCTION</option><option value="COMPLETE">COMPLETE</option><option value="TBD">TBD</option>
-        </select>
-      </td>
-      <td class="editable td-owner" contenteditable="true" data-placeholder="Owner / Team" onblur="autoSaveField()">ZW AG</td>
-      <td class="editable td-date" contenteditable="true" data-placeholder="Target date" onblur="autoSaveField()">TBD (ZW AG to publish)</td>
-      <td class="editable td-updated" contenteditable="true" data-placeholder="Last updated" onblur="autoSaveField()">Mar 06, 2026</td>
-      <td class="editable td-notes" contenteditable="true" data-placeholder="Add notes / next steps..." onblur="autoSaveField()">ZWC testing in-flight, to be completed week of Nov 3
-Overall testing to be completed week of Nov 3
-Phased go live plan to be published week of Nov 3
-Tentative go live – ZW AG to publish date</td>
-    </tr><tr data-id="6">
-      <td>6</td>
-      <td class="task-name td-name editable" contenteditable="true" data-placeholder="Task name" onblur="autoSaveField()">Best Buy EDI</td>
-      <td class="status-cell">
-        <select class="status-select badge DEVELOPMENT" onchange="applyStatusStyle(this); autoSaveField();">
-          <option value="CAB">CAB</option><option value="DESIGN">DESIGN</option><option value="DEVELOPMENT" selected="">DEVELOPMENT</option><option value="SIT">SIT</option><option value="UAT">UAT</option><option value="SCHEDULED">SCHEDULED</option><option value="RESCHEDULED">RESCHEDULED</option><option value="PAUSED">PAUSED</option><option value="PRODUCTION">PRODUCTION</option><option value="COMPLETE">COMPLETE</option><option value="TBD">TBD</option>
-        </select>
-      </td>
-      <td class="editable td-owner" contenteditable="true" data-placeholder="Owner / Team" onblur="autoSaveField()">US SAP Consultants</td>
-      <td class="editable td-date" contenteditable="true" data-placeholder="Target date" onblur="autoSaveField()">TBD</td>
-      <td class="editable td-updated" contenteditable="true" data-placeholder="Last updated" onblur="autoSaveField()">Mar 06, 2026</td>
-      <td class="editable td-notes" contenteditable="true" data-placeholder="Add notes / next steps..." onblur="autoSaveField()">Test execution underway
-UAT testing plan to be published – TBD
-Transitioned to US SAP Consultants</td>
-    </tr><tr data-id="7">
-      <td>7</td>
-      <td class="task-name td-name editable" contenteditable="true" data-placeholder="Task name" onblur="autoSaveField()">Loblaws EDI</td>
-      <td class="status-cell">
-        <select class="status-select badge PAUSED" onchange="applyStatusStyle(this); autoSaveField();">
-          <option value="CAB">CAB</option><option value="DESIGN">DESIGN</option><option value="DEVELOPMENT">DEVELOPMENT</option><option value="SIT">SIT</option><option value="UAT">UAT</option><option value="SCHEDULED">SCHEDULED</option><option value="RESCHEDULED">RESCHEDULED</option><option value="PAUSED" selected="">PAUSED</option><option value="PRODUCTION">PRODUCTION</option><option value="COMPLETE">COMPLETE</option><option value="TBD">TBD</option>
-        </select>
-      </td>
-      <td class="editable td-owner" contenteditable="true" data-placeholder="Owner / Team" onblur="autoSaveField()">US SAP Consultants</td>
-      <td class="editable td-date" contenteditable="true" data-placeholder="Target date" onblur="autoSaveField()">TBD</td>
-      <td class="editable td-updated" contenteditable="true" data-placeholder="Last updated" onblur="autoSaveField()">Mar 06, 2026</td>
-      <td class="editable td-notes" contenteditable="true" data-placeholder="Add notes / next steps..." onblur="autoSaveField()">Pause decision made by business
-Transitioned to US SAP Consultants</td>
-    </tr><tr data-id="8">
-      <td>8</td>
-      <td class="task-name td-name editable" contenteditable="true" data-placeholder="Task name" onblur="autoSaveField()">JIRA Rollout</td>
-      <td class="status-cell">
-        <select class="status-select badge PRODUCTION" onchange="applyStatusStyle(this); autoSaveField();">
-          <option value="CAB">CAB</option><option value="DESIGN">DESIGN</option><option value="DEVELOPMENT">DEVELOPMENT</option><option value="SIT">SIT</option><option value="UAT">UAT</option><option value="SCHEDULED">SCHEDULED</option><option value="RESCHEDULED">RESCHEDULED</option><option value="PAUSED">PAUSED</option><option value="PRODUCTION" selected="">PRODUCTION</option><option value="COMPLETE">COMPLETE</option><option value="TBD">TBD</option>
-        </select>
-      </td>
-      <td class="editable td-owner" contenteditable="true" data-placeholder="Owner / Team" onblur="autoSaveField()">ZWG AG IT</td>
-      <td class="editable td-date" contenteditable="true" data-placeholder="Target date" onblur="autoSaveField()">Mar 9, 2026</td>
-      <td class="editable td-updated" contenteditable="true" data-placeholder="Last updated" onblur="autoSaveField()">Mar 06, 2026</td>
-      <td class="editable td-notes" contenteditable="true" data-placeholder="Add notes / next steps..." onblur="autoSaveField()">ZWG AG IT to publish training material and roll out details March 9
-Production deployment complete</td>
-    </tr><tr data-id="9">
-      <td>9</td>
-      <td class="task-name td-name editable" contenteditable="true" data-placeholder="Task name" onblur="autoSaveField()">FedEx API Change</td>
-      <td class="status-cell">
-        <select class="status-select badge DEVELOPMENT" onchange="applyStatusStyle(this); autoSaveField();">
-          <option value="CAB">CAB</option><option value="DESIGN">DESIGN</option><option value="DEVELOPMENT" selected="">DEVELOPMENT</option><option value="SIT">SIT</option><option value="UAT">UAT</option><option value="SCHEDULED">SCHEDULED</option><option value="RESCHEDULED">RESCHEDULED</option><option value="PAUSED">PAUSED</option><option value="PRODUCTION">PRODUCTION</option><option value="COMPLETE">COMPLETE</option><option value="TBD">TBD</option>
-        </select>
-      </td>
-      <td class="editable td-owner" contenteditable="true" data-placeholder="Owner / Team" onblur="autoSaveField()"></td>
-      <td class="editable td-date" contenteditable="true" data-placeholder="Target date" onblur="autoSaveField()">TBD</td>
-      <td class="editable td-updated" contenteditable="true" data-placeholder="Last updated" onblur="autoSaveField()">Mar 06, 2026</td>
-      <td class="editable td-notes" contenteditable="true" data-placeholder="Add notes / next steps..." onblur="autoSaveField()">Design / Development phase in progress</td>
-    </tr><tr data-id="10">
-      <td>10</td>
-      <td class="task-name td-name editable" contenteditable="true" data-placeholder="Task name" onblur="autoSaveField()">6221 Location Enhancement CR</td>
-      <td class="status-cell">
-        <select class="status-select badge CAB" onchange="applyStatusStyle(this); autoSaveField();">
-          <option value="CAB" selected="">CAB</option><option value="DESIGN">DESIGN</option><option value="DEVELOPMENT">DEVELOPMENT</option><option value="SIT">SIT</option><option value="UAT">UAT</option><option value="SCHEDULED">SCHEDULED</option><option value="RESCHEDULED">RESCHEDULED</option><option value="PAUSED">PAUSED</option><option value="PRODUCTION">PRODUCTION</option><option value="COMPLETE">COMPLETE</option><option value="TBD">TBD</option>
-        </select>
-      </td>
-      <td class="editable td-owner" contenteditable="true" data-placeholder="Owner / Team" onblur="autoSaveField()"></td>
-      <td class="editable td-date" contenteditable="true" data-placeholder="Target date" onblur="autoSaveField()">TBD</td>
-      <td class="editable td-updated" contenteditable="true" data-placeholder="Last updated" onblur="autoSaveField()">Mar 06, 2026</td>
-      <td class="editable td-notes" contenteditable="true" data-placeholder="Add notes / next steps..." onblur="autoSaveField()">CAB review pending</td>
-    </tr><tr data-id="11">
-      <td>11</td>
-      <td class="task-name td-name editable" contenteditable="true" data-placeholder="Task name" onblur="autoSaveField()"></td>
-      <td class="status-cell">
-        <select class="status-select badge TBD" onchange="applyStatusStyle(this); autoSaveField();">
-          <option value="CAB">CAB</option><option value="DESIGN">DESIGN</option><option value="DEVELOPMENT">DEVELOPMENT</option><option value="SIT">SIT</option><option value="UAT">UAT</option><option value="SCHEDULED">SCHEDULED</option><option value="RESCHEDULED">RESCHEDULED</option><option value="PAUSED">PAUSED</option><option value="PRODUCTION">PRODUCTION</option><option value="COMPLETE">COMPLETE</option><option value="TBD" selected="">TBD</option>
-        </select>
-      </td>
-      <td class="editable td-owner" contenteditable="true" data-placeholder="Owner / Team" onblur="autoSaveField()"></td>
-      <td class="editable td-date" contenteditable="true" data-placeholder="Target date" onblur="autoSaveField()"></td>
-      <td class="editable td-updated" contenteditable="true" data-placeholder="Last updated" onblur="autoSaveField()">Mar 6, 2026</td>
-      <td class="editable td-notes" contenteditable="true" data-placeholder="Add notes / next steps..." onblur="autoSaveField()"></td>
-    </tr><tr class="add-row"><td colspan="7"><button class="add-btn" onclick="addTask()">＋ Add new task row</button></td></tr></tbody>
+    <tbody id="task-tbody"></tbody>
   </table>
 
   <div class="separator"></div>
@@ -703,6 +604,85 @@ Production deployment complete</td>
   <div id="appendix-notes" class="notes-box" contenteditable="true" style="margin-top:16px;" data-placeholder="Add appendix notes here...">Zwilling Canada – SAP S/4HANA Status – March 18, 2026<br>Presenter: [Name]<br>Distribution: Internal – Zwilling Canada IT / SAP Project Team<br><br>Defects Raised (as of last report):<br>• 4 defects total raised during UAT<br>  – 1 defect: user error<br>  – 3 defects: possible missing interface/mapping</div>
 
 </main>
+
+<!-- Integration Modal -->
+<div id="integration-modal">
+  <div class="int-modal-box">
+    <h2>☁️ Google Integration</h2>
+    <div class="int-sub">ZWILLING CANADA · S4 TRACKER · <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="fa968393808d93969693949dba9d979b9396d4999597">[email&#160;protected]</a></div>
+
+    <!-- NOT CONNECTED STATE -->
+    <div id="int-auth-section">
+      <div class="int-section">
+        <h4>🔐 Step 1 — Connect Google Account</h4>
+        <p>Paste your OAuth 2.0 Client ID from Google Cloud Console. This enables saving to Drive and syncing with Google Sheets.</p>
+        <input class="int-input" id="int-client-id" placeholder="e.g. 123456789-abc.apps.googleusercontent.com" />
+        <div class="int-setup-hint">
+          <strong>Quick Setup:</strong><br>
+          1. <a href="https://console.cloud.google.com" target="_blank" style="color:var(--accent)">console.cloud.google.com</a> → New Project<br>
+          2. APIs &amp; Services → Enable <strong>Google Drive API</strong> + <strong>Google Sheets API</strong><br>
+          3. Credentials → OAuth 2.0 Client ID → Web App<br>
+          4. Authorized JavaScript origins → add your hosted URL (e.g. <code>https://yourname.github.io</code>)<br>
+          5. Copy the Client ID and paste above
+        </div>
+        <div class="int-btn-row" style="margin-top:14px;">
+          <button class="btn btn-ghost" onclick="closeIntegration()">Cancel</button>
+          <button class="btn btn-primary" onclick="connectGoogle()">Connect Google</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONNECTED STATE -->
+    <div id="int-connected-section" style="display:none;">
+      <div class="int-connected-bar">
+        <span style="font-size:16px;">✅</span>
+        <span class="int-label">Google Connected</span>
+        <span class="int-email" id="int-user-email"></span>
+      </div>
+
+      <!-- DRIVE SECTION -->
+      <div class="int-section">
+        <h4>
+          <svg width="14" height="14" viewBox="0 0 87.3 78" fill="none"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H0c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="M43.65 25 29.9 1.2C28.55 2 27.4 3.1 26.6 4.5L1.2 49.5c-.8 1.4-1.2 2.95-1.2 4.5h27.5z" fill="#00ac47"/><path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H60.1l5.85 11.5z" fill="#ea4335"/><path d="M43.65 25 57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="M60.1 54H27.5L13.75 77.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.8-22.2C59.8 2.9 58.65 1.8 57.3 1l-13.65 24L60.1 54h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>
+          Google Drive — Save / Load JSON
+        </h4>
+        <p>Saves all task data as <code>zwilling_s4_tracker.json</code> in your Drive. Updates the same file — no duplicates.</p>
+        <div class="int-btn-row">
+          <button class="btn btn-success" onclick="saveToDrive()" style="font-size:12px;">⬆ Save to Drive</button>
+          <button class="btn btn-ghost" onclick="listDriveFiles()" style="font-size:12px;">🔍 Browse & Load</button>
+        </div>
+        <div id="int-drive-file-list"></div>
+      </div>
+
+      <!-- SHEETS SECTION -->
+      <div class="int-section">
+        <h4>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="3" fill="#0e9f6e"/><path d="M6 8h12M6 12h12M6 16h8" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg>
+          Google Sheets — "Zwilling Canada S4 Tracker"
+        </h4>
+        <p>Push all tasks to your Google Sheet, or pull updates back from the sheet into this tracker. The sheet is found by name automatically.</p>
+        <div id="int-sheets-status" style="font-size:11px; color:var(--muted); margin-bottom:8px; font-family:'DM Mono',monospace;"></div>
+        <div class="int-btn-row">
+          <button class="btn btn-primary" onclick="pushToSheets()" style="font-size:12px;">⬆ Push to Sheets</button>
+          <button class="btn btn-ghost" onclick="pullFromSheets()" style="font-size:12px;">⬇ Pull from Sheets</button>
+          <button class="btn btn-ghost" onclick="createSheet()" style="font-size:12px;">✨ Create Sheet</button>
+        </div>
+        <div class="int-setup-hint" style="margin-top:10px;">
+          <strong>How it works:</strong><br>
+          • <strong>Push</strong> — writes all current tasks to the sheet (overwrites rows 2+, keeps header)<br>
+          • <strong>Pull</strong> — reads the sheet and updates the tracker with any edits made in Sheets<br>
+          • <strong>Create Sheet</strong> — creates a new Google Sheet named "Zwilling Canada S4 Tracker" if one doesn't exist
+        </div>
+      </div>
+
+      <div class="int-divider"></div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <button class="btn btn-ghost" style="font-size:11px; color:#9ca3af;" onclick="disconnectGoogle()">Disconnect</button>
+        <button class="btn btn-ghost" onclick="closeIntegration()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Export Modal -->
 <div id="export-modal" class="">
@@ -741,7 +721,7 @@ Production deployment complete</td>
 
 <div id="toast" class="">✅ Changes saved to browser storage!</div>
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ── DEFAULT DATA ──
 const defaultTasks = [
   {
@@ -1305,6 +1285,311 @@ function saveHTMLFile() {
 document.getElementById('export-modal').addEventListener('click', function(e) {
   if (e.target === this) closeExport();
 });
+document.getElementById('integration-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeIntegration();
+});
+
+// ══════════════════════════════════════════════
+// GOOGLE DRIVE + SHEETS INTEGRATION
+// ══════════════════════════════════════════════
+
+let _gToken = null;
+let _gClientId = null;
+let _driveFileId = null;
+let _sheetId = null;
+const SHEET_NAME = 'Zwilling Canada S4 Tracker';
+const DRIVE_FILE  = 'zwilling_s4_tracker.json';
+const HEADERS = ['#', 'Task Name', 'Status', 'Owner', 'Target Date', 'Last Updated', 'Notes / Next Steps'];
+
+function openIntegration() {
+  const authEl   = document.getElementById('int-auth-section');
+  const connEl   = document.getElementById('int-connected-section');
+  if (_gToken) {
+    authEl.style.display = 'none';
+    connEl.style.display = 'block';
+  } else {
+    authEl.style.display = 'block';
+    connEl.style.display = 'none';
+  }
+  document.getElementById('integration-modal').classList.add('show');
+}
+
+function closeIntegration() {
+  document.getElementById('integration-modal').classList.remove('show');
+}
+
+// ── CONNECT ──
+function connectGoogle() {
+  const clientId = document.getElementById('int-client-id').value.trim();
+  if (!clientId) { showToast('⚠ Paste your OAuth Client ID first'); return; }
+
+  const doAuth = () => {
+    google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: [
+        'https://www.googleapis.com/auth/drive.file',
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/userinfo.email'
+      ].join(' '),
+      callback: async (resp) => {
+        if (!resp.access_token) return;
+        _gToken    = resp.access_token;
+        _gClientId = clientId;
+
+        // Get user email
+        try {
+          const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: 'Bearer ' + _gToken }
+          });
+          const u = await r.json();
+          document.getElementById('int-user-email').textContent = u.email || '';
+        } catch(e) {}
+
+        // Update UI
+        document.getElementById('drive-dot').classList.add('connected');
+        document.getElementById('drive-pill-text').textContent = 'Drive Connected';
+        document.getElementById('sheets-pill').style.display = 'flex';
+        document.getElementById('sheets-pill-text').textContent = 'Sheets Ready';
+        document.getElementById('int-auth-section').style.display = 'none';
+        document.getElementById('int-connected-section').style.display = 'block';
+
+        showToast('✅ Google connected!');
+        // Try to find existing sheet
+        findSheet();
+      }
+    }).requestAccessToken();
+  };
+
+  if (typeof google !== 'undefined' && google.accounts) {
+    doAuth();
+  } else {
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.onload = doAuth;
+    document.head.appendChild(s);
+  }
+}
+
+function disconnectGoogle() {
+  _gToken = null; _gClientId = null; _driveFileId = null; _sheetId = null;
+  document.getElementById('drive-dot').classList.remove('connected');
+  document.getElementById('drive-pill-text').textContent = 'Connect Drive';
+  document.getElementById('sheets-pill').style.display = 'none';
+  document.getElementById('int-auth-section').style.display = 'block';
+  document.getElementById('int-connected-section').style.display = 'none';
+  document.getElementById('int-drive-file-list').innerHTML = '';
+  document.getElementById('int-sheets-status').textContent = '';
+  showToast('Disconnected from Google');
+}
+
+// ── DRIVE SAVE ──
+async function saveToDrive() {
+  if (!_gToken) { showToast('⚠ Connect Google first'); return; }
+  saveTasks();
+  const payload = JSON.stringify({ tasks, appendix: document.getElementById('appendix-notes').innerText }, null, 2);
+  const blob = new Blob([payload], { type: 'application/json' });
+  showToast('⏳ Saving to Drive…');
+  try {
+    let res;
+    if (_driveFileId) {
+      res = await fetch('https://www.googleapis.com/upload/drive/v3/files/' + _driveFileId + '?uploadType=media', {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer ' + _gToken, 'Content-Type': 'application/json' },
+        body: blob
+      });
+    } else {
+      const meta = JSON.stringify({ name: DRIVE_FILE, mimeType: 'application/json' });
+      const form = new FormData();
+      form.append('metadata', new Blob([meta], { type: 'application/json' }));
+      form.append('file', blob);
+      res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + _gToken },
+        body: form
+      });
+    }
+    if (res.ok) {
+      const d = await res.json();
+      if (d.id) _driveFileId = d.id;
+      document.getElementById('drive-pill-text').textContent = 'Drive Synced ✓';
+      showToast('✅ Saved to Google Drive!');
+    } else {
+      if (res.status === 401) { disconnectGoogle(); showToast('⚠ Session expired — reconnect'); }
+      else showToast('⚠ Drive save failed (' + res.status + ')');
+    }
+  } catch(e) { showToast('⚠ Network error saving to Drive'); }
+}
+
+// ── DRIVE BROWSE / LOAD ──
+async function listDriveFiles() {
+  if (!_gToken) return;
+  const container = document.getElementById('int-drive-file-list');
+  container.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:8px 0;">Loading…</div>';
+  try {
+    const q = encodeURIComponent("name='" + DRIVE_FILE + "' and trashed=false");
+    const res = await fetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name,modifiedTime,size)&orderBy=modifiedTime%20desc', {
+      headers: { Authorization: 'Bearer ' + _gToken }
+    });
+    const d = await res.json();
+    const files = d.files || [];
+    if (!files.length) {
+      container.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:8px 0;">No saved files yet. Click "Save to Drive" first.</div>';
+      return;
+    }
+    container.innerHTML = files.map(f => {
+      const dt = new Date(f.modifiedTime).toLocaleString();
+      const kb = f.size ? (Math.round(f.size/102.4)/10) + ' KB' : '';
+      return `<div class="int-file-item"><div><div class="int-fname">📄 ${f.name}</div><div class="int-fmeta">${dt}${kb ? ' · ' + kb : ''}</div></div><button class="btn btn-ghost" style="font-size:11px;padding:4px 10px;" onclick="loadFromDrive('${f.id}')">Load</button></div>`;
+    }).join('');
+  } catch(e) { container.innerHTML = '<div style="font-size:11px;color:var(--red);padding:8px 0;">Error listing files.</div>'; }
+}
+
+async function loadFromDrive(fileId) {
+  if (!confirm('Load from Drive? This replaces current session data.')) return;
+  showToast('⏳ Loading from Drive…');
+  try {
+    const res = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', {
+      headers: { Authorization: 'Bearer ' + _gToken }
+    });
+    const d = await res.json();
+    if (d.tasks) {
+      tasks = d.tasks;
+      _driveFileId = fileId;
+      localStorage.setItem('zwilling_tasks', JSON.stringify(tasks));
+      if (d.appendix) {
+        document.getElementById('appendix-notes').innerText = d.appendix;
+        localStorage.setItem('zwilling_appendix', d.appendix);
+      }
+      renderTasks();
+      closeIntegration();
+      showToast('✅ Loaded from Drive!');
+    } else { showToast('⚠ Unrecognized file format'); }
+  } catch(e) { showToast('⚠ Error loading file'); }
+}
+
+// ── SHEETS — FIND / CREATE ──
+async function findSheet() {
+  if (!_gToken) return;
+  try {
+    const q = encodeURIComponent("name='" + SHEET_NAME + "' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false");
+    const res = await fetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name)', {
+      headers: { Authorization: 'Bearer ' + _gToken }
+    });
+    const d = await res.json();
+    if (d.files && d.files.length) {
+      _sheetId = d.files[0].id;
+      document.getElementById('int-sheets-status').textContent = '✅ Sheet found: ' + SHEET_NAME + ' (' + _sheetId.slice(0,10) + '…)';
+      document.getElementById('sheets-pill-text').textContent = 'Sheet Linked ✓';
+    } else {
+      document.getElementById('int-sheets-status').textContent = 'Sheet not found — click "Create Sheet" to make one.';
+    }
+  } catch(e) {}
+}
+
+async function createSheet() {
+  if (!_gToken) { showToast('⚠ Connect Google first'); return; }
+  showToast('⏳ Creating Google Sheet…');
+  try {
+    const res = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + _gToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ properties: { title: SHEET_NAME }, sheets: [{ properties: { title: 'Status Tracker' } }] })
+    });
+    const d = await res.json();
+    if (d.spreadsheetId) {
+      _sheetId = d.spreadsheetId;
+      document.getElementById('int-sheets-status').textContent = '✅ Created: ' + SHEET_NAME;
+      document.getElementById('sheets-pill-text').textContent = 'Sheet Linked ✓';
+      showToast('✅ Sheet created! Pushing data…');
+      await pushToSheets();
+    } else { showToast('⚠ Could not create sheet'); }
+  } catch(e) { showToast('⚠ Error creating sheet'); }
+}
+
+// ── SHEETS PUSH ──
+async function pushToSheets() {
+  if (!_gToken) { showToast('⚠ Connect Google first'); return; }
+  if (!_sheetId) { await findSheet(); }
+  if (!_sheetId) { showToast('⚠ Sheet not found — click "Create Sheet" first'); return; }
+
+  saveTasks();
+  showToast('⏳ Pushing to Sheets…');
+
+  const values = [HEADERS, ...tasks.map(t => [
+    t.id, t.name, t.status, t.owner, t.targetDate, t.lastUpdated,
+    (t.notes || '').replace(/\n/g, ' | ')
+  ])];
+
+  try {
+    // Clear existing data first
+    await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + _sheetId + '/values/%27Status%20Tracker%27!A1:G200:clear', {
+      method: 'POST', headers: { Authorization: 'Bearer ' + _gToken, 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+
+    const res = await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + _sheetId + '/values/%27Status%20Tracker%27!A1:G200?valueInputOption=RAW', {
+      method: 'PUT',
+      headers: { Authorization: 'Bearer ' + _gToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ range: "'Status Tracker'!A1:G200", majorDimension: 'ROWS', values })
+    });
+
+    if (res.ok) {
+      await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + _sheetId + ':batchUpdate', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + _gToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requests: [
+          { repeatCell: { range: { sheetId: 0, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 7 },
+            cell: { userEnteredFormat: { backgroundColor: { red: 0.1, green: 0.337, blue: 0.859 },
+              textFormat: { foregroundColor: { red:1,green:1,blue:1 }, bold: true, fontSize: 10 } } },
+            fields: 'userEnteredFormat(backgroundColor,textFormat)' }
+          },
+          { updateSheetProperties: { properties: { sheetId: 0, gridProperties: { frozenRowCount: 1 } }, fields: 'gridProperties.frozenRowCount' } }
+        ]})
+      });
+
+      document.getElementById('sheets-pill-text').textContent = 'Sheets Synced ✓';
+      document.getElementById('int-sheets-status').textContent = '✅ Pushed ' + tasks.length + ' rows to "' + SHEET_NAME + '"';
+      showToast('✅ Pushed to Google Sheets!');
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast('⚠ Sheets push failed: ' + (err.error?.message || res.status));
+    }
+  } catch(e) { showToast('⚠ Push error: ' + e.message); }
+}
+
+// ── SHEETS PULL ──
+async function pullFromSheets() {
+  if (!_gToken) { showToast('⚠ Connect Google first'); return; }
+  if (!_sheetId) { await findSheet(); }
+  if (!_sheetId) { showToast('⚠ Sheet not found — push data first'); return; }
+  if (!confirm('Pull from "' + SHEET_NAME + '"? This overwrites the current tracker data.')) return;
+
+  showToast('⏳ Pulling from Sheets…');
+  try {
+    const res = await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + _sheetId + '/values/%27Status%20Tracker%27!A2:G200', {
+      headers: { Authorization: 'Bearer ' + _gToken }
+    });
+    const d = await res.json();
+    if (!res.ok) { showToast('⚠ Pull failed: ' + (d.error?.message || res.status)); return; }
+    const rows = d.values || [];
+    if (!rows.length) { showToast('⚠ Sheet appears empty'); return; }
+
+    tasks = rows.filter(r => r[0] && r[1]).map(r => ({
+      id: parseInt(r[0]) || 0,
+      name: r[1] || '',
+      status: r[2] || 'TBD',
+      owner: r[3] || '',
+      targetDate: r[4] || '',
+      lastUpdated: r[5] || '',
+      notes: (r[6] || '').replace(/ \| /g, '\n')
+    }));
+
+    localStorage.setItem('zwilling_tasks', JSON.stringify(tasks));
+    renderTasks();
+    document.getElementById('int-sheets-status').textContent = '✅ Pulled ' + tasks.length + ' rows from Sheets';
+    showToast('✅ Pulled from Google Sheets!');
+  } catch(e) { showToast('⚠ Error pulling from Sheets'); }
+}
 
 // ── HEADER DATE ──
 function saveHeaderDate() {
@@ -1329,12 +1614,21 @@ const savedDate = localStorage.getItem('zwilling_header_date');
 if (savedDate) document.getElementById('header-date').innerText = savedDate;
 
 // Restore appendix
-const savedAppendix = localStorage.getItem('zwilling_appendix');
+const savedAppendix = localStorage.getItem('zwilling_zwilling_appendix');
 if (savedAppendix) document.getElementById('appendix-notes').innerText = savedAppendix;
 
 // Auto-save appendix
 document.getElementById('appendix-notes').addEventListener('blur', autoSaveField);
-</script>
 
+// Close integration modal on backdrop click
+document.getElementById('integration-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeIntegration();
+});
+
+// Close export modal on backdrop click
+document.getElementById('export-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeExport();
+});
+</script>
 
 </body></html>
