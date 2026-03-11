@@ -1520,41 +1520,74 @@ async function pushToSheets() {
     (t.notes || '').replace(/\n/g, ' | ')
   ])];
 
+  const BASE = 'https://sheets.googleapis.com/v4/spreadsheets/' + _sheetId;
+  const AUTH = { Authorization: 'Bearer ' + _gToken, 'Content-Type': 'application/json' };
+
   try {
-    // Clear existing data first
-    await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + _sheetId + '/values/%27Status%20Tracker%27!A1:G200:clear', {
-      method: 'POST', headers: { Authorization: 'Bearer ' + _gToken, 'Content-Type': 'application/json' },
-      body: '{}'
+    // Step 1 — get the real sheetId (integer) for the first tab
+    const metaRes = await fetch(BASE + '?fields=sheets.properties', { headers: AUTH });
+    const meta = await metaRes.json();
+    if (!metaRes.ok) { showToast('⚠ Could not read sheet: ' + (meta.error?.message || metaRes.status)); return; }
+    const tabId = meta.sheets[0].properties.sheetId; // integer e.g. 0
+
+    // Step 2 — clear the sheet
+    const clearRes = await fetch(BASE + '/values/A1:G500:clear', {
+      method: 'POST', headers: AUTH, body: '{}'
     });
-
-    const res = await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + _sheetId + '/values/%27Status%20Tracker%27!A1:G200?valueInputOption=RAW', {
-      method: 'PUT',
-      headers: { Authorization: 'Bearer ' + _gToken, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ range: "'Status Tracker'!A1:G200", majorDimension: 'ROWS', values })
-    });
-
-    if (res.ok) {
-      await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + _sheetId + ':batchUpdate', {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + _gToken, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requests: [
-          { repeatCell: { range: { sheetId: 0, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 7 },
-            cell: { userEnteredFormat: { backgroundColor: { red: 0.1, green: 0.337, blue: 0.859 },
-              textFormat: { foregroundColor: { red:1,green:1,blue:1 }, bold: true, fontSize: 10 } } },
-            fields: 'userEnteredFormat(backgroundColor,textFormat)' }
-          },
-          { updateSheetProperties: { properties: { sheetId: 0, gridProperties: { frozenRowCount: 1 } }, fields: 'gridProperties.frozenRowCount' } }
-        ]})
-      });
-
-      document.getElementById('sheets-pill-text').textContent = 'Sheets Synced ✓';
-      document.getElementById('int-sheets-status').textContent = '✅ Pushed ' + tasks.length + ' rows to "' + SHEET_NAME + '"';
-      showToast('✅ Pushed to Google Sheets!');
-    } else {
-      const err = await res.json().catch(() => ({}));
-      showToast('⚠ Sheets push failed: ' + (err.error?.message || res.status));
+    if (!clearRes.ok) {
+      const ce = await clearRes.json().catch(() => ({}));
+      console.warn('Clear warning:', ce.error?.message);
     }
-  } catch(e) { showToast('⚠ Push error: ' + e.message); }
+
+    // Step 3 — write values using Sheet index (Sheet1) — most reliable
+    const writeRes = await fetch(BASE + '/values/Sheet1!A1:G500?valueInputOption=RAW', {
+      method: 'PUT', headers: AUTH,
+      body: JSON.stringify({ range: 'Sheet1!A1:G500', majorDimension: 'ROWS', values })
+    });
+
+    // If Sheet1 alias fails, try by tab index
+    let finalRes = writeRes;
+    if (!writeRes.ok) {
+      const rangeEncoded = encodeURIComponent('A1:G500');
+      finalRes = await fetch(BASE + '/values/' + rangeEncoded + '?valueInputOption=RAW', {
+        method: 'PUT', headers: AUTH,
+        body: JSON.stringify({ range: 'A1:G500', majorDimension: 'ROWS', values })
+      });
+    }
+
+    if (!finalRes.ok) {
+      const err = await finalRes.json().catch(() => ({}));
+      showToast('⚠ Push failed: ' + (err.error?.message || finalRes.status));
+      return;
+    }
+
+    // Step 4 — format header row (blue background, white bold text, freeze row 1)
+    await fetch(BASE + ':batchUpdate', {
+      method: 'POST', headers: AUTH,
+      body: JSON.stringify({ requests: [
+        { repeatCell: {
+            range: { sheetId: tabId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 7 },
+            cell: { userEnteredFormat: {
+              backgroundColor: { red: 0.102, green: 0.337, blue: 0.859 },
+              textFormat: { foregroundColor: { red:1, green:1, blue:1 }, bold: true, fontSize: 10 }
+            }},
+            fields: 'userEnteredFormat(backgroundColor,textFormat)'
+        }},
+        { updateSheetProperties: {
+            properties: { sheetId: tabId, gridProperties: { frozenRowCount: 1 } },
+            fields: 'gridProperties.frozenRowCount'
+        }}
+      ]})
+    });
+
+    document.getElementById('sheets-pill-text').textContent = 'Sheets Synced ✓';
+    document.getElementById('int-sheets-status').textContent = '✅ Pushed ' + tasks.length + ' rows to "' + SHEET_NAME + '"';
+    showToast('✅ Pushed to Google Sheets!');
+
+  } catch(e) {
+    console.error('pushToSheets error:', e);
+    showToast('⚠ Push error: ' + e.message);
+  }
 }
 
 // ── SHEETS PULL ──
@@ -1565,17 +1598,23 @@ async function pullFromSheets() {
   if (!confirm('Pull from "' + SHEET_NAME + '"? This overwrites the current tracker data.')) return;
 
   showToast('⏳ Pulling from Sheets…');
+  const BASE = 'https://sheets.googleapis.com/v4/spreadsheets/' + _sheetId;
+  const AUTH = { Authorization: 'Bearer ' + _gToken };
+
   try {
-    const res = await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + _sheetId + '/values/%27Status%20Tracker%27!A2:G200', {
-      headers: { Authorization: 'Bearer ' + _gToken }
-    });
+    // Try Sheet1 alias first, fall back to bare range
+    let res = await fetch(BASE + '/values/Sheet1!A2:G500', { headers: AUTH });
+    if (!res.ok) {
+      res = await fetch(BASE + '/values/A2:G500', { headers: AUTH });
+    }
     const d = await res.json();
     if (!res.ok) { showToast('⚠ Pull failed: ' + (d.error?.message || res.status)); return; }
+
     const rows = d.values || [];
     if (!rows.length) { showToast('⚠ Sheet appears empty'); return; }
 
-    tasks = rows.filter(r => r[0] && r[1]).map(r => ({
-      id: parseInt(r[0]) || 0,
+    tasks = rows.filter(r => r[0] && r[1]).map((r, i) => ({
+      id: parseInt(r[0]) || i + 1,
       name: r[1] || '',
       status: r[2] || 'TBD',
       owner: r[3] || '',
@@ -1588,7 +1627,10 @@ async function pullFromSheets() {
     renderTasks();
     document.getElementById('int-sheets-status').textContent = '✅ Pulled ' + tasks.length + ' rows from Sheets';
     showToast('✅ Pulled from Google Sheets!');
-  } catch(e) { showToast('⚠ Error pulling from Sheets'); }
+  } catch(e) {
+    console.error('pullFromSheets error:', e);
+    showToast('⚠ Pull error: ' + e.message);
+  }
 }
 
 // ── HEADER DATE ──
