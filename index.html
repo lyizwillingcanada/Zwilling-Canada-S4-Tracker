@@ -616,7 +616,7 @@
       <div class="int-section">
         <h4>🔐 Step 1 — Connect Google Account</h4>
         <p>Paste your OAuth 2.0 Client ID from Google Cloud Console. This enables saving to Drive and syncing with Google Sheets.</p>
-        <input class="int-input" id="395190593545-q6kral31l208jtl7omgsjskpbog6pec4.apps.googleusercontent.com />
+        <input class="int-input" id="int-client-id" placeholder="e.g. 123456789-abc.apps.googleusercontent.com" />
         <div class="int-setup-hint">
           <strong>Quick Setup:</strong><br>
           1. <a href="https://console.cloud.google.com" target="_blank" style="color:var(--accent)">console.cloud.google.com</a> → New Project<br>
@@ -1328,7 +1328,8 @@ function closeIntegration() {
 
 // ── CONNECT ──
 function connectGoogle() {
-  const clientId = document.getElementById('int-client-id').value.trim();
+  const inputEl = document.getElementById('int-client-id');
+  const clientId = (inputEl ? inputEl.value.trim() : '') || '395190593545-q6kral31l208jtl7omgsjskpbog6pec4.apps.googleusercontent.com';
   if (!clientId) { showToast('⚠ Paste your OAuth Client ID first'); return; }
 
   const doAuth = () => {
